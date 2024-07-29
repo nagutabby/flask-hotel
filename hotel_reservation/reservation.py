@@ -81,7 +81,7 @@ def create():
     for reservation in reservations:
         number_reserved_rooms += int(reservation.number_rooms)
         if number_reserved_rooms + number_rooms > 10:
-            error = f'Rooms are full.'
+            error = 'Rooms are full.'
 
     if error is not None:
         print_reservation_result(error, start_date, end_date, number_rooms)
@@ -198,11 +198,11 @@ def update(id):
     return make_response(jsonify(reservation), 200)
 
 
-@bp.route('/search', methods=('POST',))
+@bp.route('/search', methods=('GET',))
 @login_required
 def search():
     error = None
-    r = request.json
+    r = request.args
     start_date = r['start_date']
 
     if not start_date:
