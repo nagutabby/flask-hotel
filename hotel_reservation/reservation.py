@@ -199,7 +199,6 @@ def update(id):
 
     return make_response(jsonify(reservation), 200)
 
-
 @bp.route('/search', methods=('GET',))
 @login_required
 def search():
