@@ -87,7 +87,7 @@ def load_logged_in_user():
         Session = sessionmaker(bind=engine, expire_on_commit=False)
 
         with Session.begin() as db_session:
-            g.user = db_session.query(User).where(User.id == user_id).one()
+            g.user = db_session.query(User).where(User.id == user_id)
 
 def login_required(view):
     @functools.wraps(view)
