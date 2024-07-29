@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Edit reservation{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  <label for="start-date">利用開始日</label>
+  <input type="date" name="start-date" id="start-date" value="{{ reservation['start_date'] }}" required>
+  <label for="end-date">利用終了日</label>
+  <input type="date" name="end-date" id="end-date" value="{{ reservation['end_date'] }}" required>
+  <label for="number-rooms">部屋数</label>
+  <input type="number" name="number-rooms" id="number-rooms" min="1" value="{{ reservation['number_rooms'] }}" required>
+  <input type="submit" value="Save">
+</form>
+<hr>
+<form action="{{ url_for('reservation.delete', id=reservation['id']) }}" method="post">
+  <input type="submit" value="Delete" onclick="return confirm('Are you sure?');">
+</form>
+{% endblock %}

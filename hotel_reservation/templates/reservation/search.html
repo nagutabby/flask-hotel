@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}Search reservation{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+<form method="post">
+  <label for="start-date">利用開始日</label>
+  <input type="date" name="start-date" id="start-date" required>
+  <input type="submit" value="Search">
+</form>
+{% endblock %}

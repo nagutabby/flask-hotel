@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+
+{% block header %}
+  <h1>{% block title %}New reservation{% endblock %}</h1>
+{% endblock %}
+
+{% block content %}
+  <form method="post">
+    <label for="start-date">利用開始日</label>
+    <input type="date" name="start-date" id="start-date" value="{{ request.form['start-date'] }}" required>
+    <label for="end-date">利用終了日</label>
+    <input type="date" name="end-date" id="end-date" value="{{ request.form['end-date'] }}" required>
+    <label for="number-rooms">部屋数</label>
+    <input type="number" name="number-rooms" id="number-rooms" min="1" value="{{ request.form['number-rooms'] }}" required>
+    <input type="submit" value="Save">
+  </form>
+{% endblock %}
