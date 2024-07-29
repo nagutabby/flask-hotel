@@ -1,5 +1,5 @@
 # flask-hotel
-## Prerequisites
+## Prerequisite
 - Python 3.11
 
 ## How to launch the app
