@@ -18,13 +18,14 @@ bp = Blueprint('reservation', __name__, url_prefix='/reservation')
 @bp.route('/')
 @login_required
 def index():
+    user_id = int(session['user_id'])
     engine = create_engine(current_app.config['SQLALCHEMY_DATABASE_URI'], echo=True)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
 
     with Session.begin() as db_session:
         response = db_session.query(Reservation) \
             .join(User, Reservation.user_id == User.id) \
-            .where(Reservation.user_id == g.user.id) \
+            .where(Reservation.user_id == user_id) \
             .all()
 
     reservations = [
@@ -42,6 +43,7 @@ def index():
 @bp.route('/create', methods=('POST',))
 @login_required
 def create():
+    user_id = int(session['user_id'])
     r = request.json
     start_date = r['start_date']
     end_date = r['end_date']
@@ -89,7 +91,7 @@ def create():
     else:
         with Session.begin() as db_session:
             db_session.add(
-                Reservation(user_id=g.user.id, start_date=start_date, end_date=end_date, number_rooms=number_rooms)
+                Reservation(user_id=user_id, start_date=start_date, end_date=end_date, number_rooms=number_rooms)
             )
 
         print_reservation_result(error, start_date, end_date, number_rooms)
@@ -201,6 +203,7 @@ def update(id):
 @bp.route('/search', methods=('GET',))
 @login_required
 def search():
+    user_id = int(session['user_id'])
     error = None
     r = request.args
     start_date = r['start_date']
@@ -220,7 +223,7 @@ def search():
         with Session.begin() as db_session:
             response = db_session.query(Reservation) \
                 .join(User, Reservation.user_id == User.id) \
-                .where(Reservation.user_id == g.user.id, Reservation.start_date == start_date) \
+                .where(Reservation.user_id == user_id, Reservation.start_date == start_date) \
                 .all()
 
         reservations = [
