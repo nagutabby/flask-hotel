@@ -1,7 +1,6 @@
 import os
 
 from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
 
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
@@ -10,8 +9,6 @@ def create_app(test_config=None):
         DATABASE=os.path.join(app.instance_path, 'hotel_reservation.sqlite'),
         SQLALCHEMY_DATABASE_URI=f"sqlite:///{os.path.join(app.instance_path, 'hotel_reservation.sqlite')}"
     )
-
-    db = SQLAlchemy(app)
 
     if test_config is None:
         app.config.from_pyfile('config.py', silent=True)

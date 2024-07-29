@@ -1,7 +1,15 @@
 {% extends 'base.html' %}
 
 {% block header %}
-  <h1>{% block title %}Reservations{% endblock %}</h1>
+  <h1>
+    {% block title %}
+      {% if title is defined %}
+        {{ title }}
+      {% else %}
+        Reservations
+      {% endif %}
+    {% endblock %}
+  </h1>
   <a href="{{ url_for('reservation.create') }}">New</a>
   <a href="{{ url_for('reservation.search') }}">Search</a>
 {% endblock %}
@@ -11,13 +19,13 @@
     <nav>
       <ul>
         <li>
-          {{ reservation['username'] }},
-          {{ reservation['start_date'] }},
-          {{ reservation['end_date'] }},
-          {{ reservation['number_rooms'] }}
+          {{ reservation.username }},
+          {{ reservation.start_date }},
+          {{ reservation.end_date }},
+          {{ reservation.number_rooms }}
         </li>
         <li>
-          <a href="{{ url_for('reservation.update', id=reservation['id']) }}">Edit</a>
+          <a href="{{ url_for('reservation.update', id=reservation.id) }}">Edit</a>
         </li>
         {% if not loop.last %}
           <hr>

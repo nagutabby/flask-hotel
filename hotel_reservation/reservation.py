@@ -1,46 +1,48 @@
 from datetime import datetime, timedelta
 
 from flask import (
-    Blueprint, g, redirect, render_template, request, session, url_for, abort
+    Blueprint, g, redirect, render_template, request, session, url_for, abort, current_app
 )
 from sqlalchemy import *
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.orm.exc import NoResultFound
 
 from hotel_reservation.auth import login_required
-from hotel_reservation.db import get_db
 
-class Base(DeclarativeBase):
-    pass
+Base = declarative_base()
 
 class User(Base):
     __tablename__ = 'user'
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(String, unique=True)
-    age: Mapped[int] = mapped_column(Integer, unique=True)
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True)
+    age = Column(String, unique=True)
 
 class Reservation(Base):
     __tablename__ = 'reservation'
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey('user.id'))
-    start_date: Mapped[int] = mapped_column(Integer)
-    end_date: Mapped[int] = mapped_column(Integer)
-    number_rooms: Mapped[int] = mapped_column(Integer)
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('user.id'))
+    start_date = Column(Date)
+    end_date = Column(Date)
+    number_rooms = Column(Integer)
 
 bp = Blueprint('reservation', __name__, url_prefix='/reservation')
 
 @bp.route('/')
 @login_required
 def index():
-    db = get_db()
-    user_id = int(session['user_id'])
-    reservations = db.execute(
-        'SELECT r.id, u.username, start_date, end_date, number_rooms'
-        ' FROM reservation r JOIN user u ON r.user_id = u.id'
-        ' WHERE r.user_id = ?',
-        (user_id,)
-    ).fetchall()
+    engine = create_engine(current_app.config['SQLALCHEMY_DATABASE_URI'], echo=True)
+    Session = sessionmaker(bind=engine)
+
+    with Session.begin() as db_session:
+        reservations = db_session.query(Reservation,
+            Reservation.id, User.username, Reservation.start_date, Reservation.end_date, Reservation.number_rooms) \
+            .join(User, Reservation.user_id == User.id) \
+            .where(Reservation.user_id == g.user['id']) \
+            .all()
+
+    print(reservations)
 
     return render_template('reservation/index.html', reservations=reservations)
 
@@ -73,45 +75,50 @@ def create():
         elif end_date > datetime.today().date() + timedelta(days=30):
             error = 'You can reserve the hotel up to 30 days.'
 
-        db = get_db()
-        reservations = db.execute(
-            "SELECT number_rooms FROM reservation"
-            " WHERE start_date >= strftime('%m-%d-%Y', date('now'))"
-        ).fetchall()
+        engine = create_engine(current_app.config['SQLALCHEMY_DATABASE_URI'], echo=True)
+        Session = sessionmaker(bind=engine)
+
+        with Session.begin() as db_session:
+            reservations = db_session.query(Reservation,
+                Reservation.number_rooms) \
+                .where(Reservation.start_date >= datetime.today().date()) \
+                .all()
+
         number_reserved_rooms = 0
         for reservation in reservations:
-            number_reserved_rooms += int(reservation['number_rooms'])
-        if number_reserved_rooms + number_rooms > 10:
-            error = f'Rooms are full.'
+            number_reserved_rooms += int(reservation.number_rooms)
+            if number_reserved_rooms + number_rooms > 10:
+                error = f'Rooms are full.'
 
         if error is not None:
             print_reservation_result(error, start_date, end_date, number_rooms)
             return render_template('reservation/error.html', error=error)
         else:
-            db = get_db()
-            db.execute(
-                'INSERT INTO reservation (user_id, start_date, end_date, number_rooms)'
-                ' VALUES (?, ?, ?, ?)',
-                (g.user['id'], start_date, end_date, number_rooms)
-            )
-            db.commit()
+            with Session.begin() as db_session:
+                db_session.add(
+                    Reservation(user_id=g.user['id'], start_date=start_date, end_date=end_date, number_rooms=number_rooms)
+                )
+
             print_reservation_result(error, start_date, end_date, number_rooms)
             return redirect(url_for('reservation.index'))
 
     return render_template('reservation/create.html')
 
 def get_reservation(id):
-    reservation = get_db().execute(
-        'SELECT r.id, user_id, u.username, start_date, end_date, number_rooms'
-        ' FROM reservation r JOIN user u ON r.user_id = u.id'
-        ' WHERE r.id = ?',
-        (id,)
-    ).fetchone()
+    engine = create_engine(current_app.config['SQLALCHEMY_DATABASE_URI'], echo=True)
+    Session = sessionmaker(bind=engine)
 
-    if reservation is None:
-        abort(404, f"Reservation id {id} doesn't exist.")
+    with Session.begin() as db_session:
+        try:
+            reservation = db_session.query(Reservation,
+                Reservation.id, Reservation.user_id, User.username, Reservation.start_date, Reservation.end_date, Reservation.number_rooms) \
+               .join(User, Reservation.user_id == User.id) \
+               .where(Reservation.id == id) \
+               .one()
+        except NoResultFound:
+            abort(404, f"Reservation id {id} doesn't exist.")
 
-    if reservation['user_id'] != g.user['id']:
+    if reservation.user_id != g.user['id']:
         abort(403)
 
     return reservation
@@ -147,15 +154,18 @@ def update(id):
         elif end_date > datetime.today().date() + timedelta(days=30):
             error = 'You can reserve the hotel up to 30 days.'
 
-        db = get_db()
-        reservations = db.execute(
-            "SELECT number_rooms FROM reservation"
-            " WHERE start_date >= strftime('%m-%d-%Y', date('now')) AND NOT id = ?",
-            (id, )
-        ).fetchall()
+        engine = create_engine(current_app.config['SQLALCHEMY_DATABASE_URI'], echo=True)
+        Session = sessionmaker(bind=engine)
+
+        with Session.begin() as db_session:
+            reservations = db_session.query(Reservation,
+                Reservation.number_rooms) \
+                .where(Reservation.start_date >= datetime.today().date(), not_(Reservation.id == id)) \
+                .all()
+
         number_reserved_rooms = 0
         for reservation in reservations:
-            number_reserved_rooms += int(reservation['number_rooms'])
+            number_reserved_rooms += int(reservation.number_rooms)
         if number_reserved_rooms + number_rooms > 10:
             error = f'Rooms are full.'
 
@@ -163,13 +173,15 @@ def update(id):
             print_reservation_result(error, start_date, end_date, number_rooms)
             return render_template('reservation/error.html', error=error)
         else:
-            db = get_db()
-            db.execute(
-                'UPDATE reservation SET start_date = ?, end_date = ?, number_rooms = ?'
-                ' WHERE id = ?',
-                (start_date, end_date, number_rooms, id)
-            )
-            db.commit()
+            with Session.begin() as db_session:
+                reservation = db_session.query(Reservation) \
+                    .where(Reservation.id == id) \
+                    .one()
+
+                reservation.start_date = start_date
+                reservation.end_date = end_date
+                reservation.number_rooms = number_rooms
+
             print_reservation_result(error, start_date, end_date, number_rooms)
             return redirect(url_for('reservation.index'))
 
@@ -180,28 +192,43 @@ def update(id):
 @login_required
 def search():
     if request.method == 'POST':
-        db = get_db()
-        user_id = int(session['user_id'])
-
+        error = None
         start_date = request.form['start-date']
 
-        reservations = db.execute(
-            'SELECT r.id, u.username, start_date, end_date, number_rooms'
-            ' FROM reservation r JOIN user u ON r.user_id = u.id'
-            ' WHERE r.user_id = ? AND start_date = ?',
-            (user_id, start_date)
-        ).fetchall()
+        if not start_date:
+            error = 'Start date is required.'
 
-        return render_template('reservation/index.html', reservations=reservations)
+        start_date = datetime.strptime(start_date, '%Y-%m-%d').date()
+
+        if error is not None:
+            print_reservation_result(error, start_date, end_date, number_rooms)
+            return render_template('reservation/error.html', error=error)
+        else:
+            engine = create_engine(current_app.config['SQLALCHEMY_DATABASE_URI'], echo=True)
+            Session = sessionmaker(bind=engine)
+
+            with Session.begin() as db_session:
+                reservations = db_session.query(Reservation,
+                    Reservation.id, User.username, Reservation.start_date, Reservation.end_date, Reservation.number_rooms) \
+                    .join(User, Reservation.user_id == User.id) \
+                    .where(Reservation.user_id == g.user['id'], Reservation.start_date == start_date) \
+                    .all()
+
+            return render_template('reservation/index.html', reservations=reservations, title='Search result')
 
     return render_template('reservation/search.html')
 
 @bp.route('/<int:id>/delete', methods=('POST',))
 @login_required
 def delete(id):
-    db = get_db()
-    db.execute('DELETE FROM reservation WHERE id = ?', (id,))
-    db.commit()
+    engine = create_engine(current_app.config['SQLALCHEMY_DATABASE_URI'], echo=True)
+    Session = sessionmaker(bind=engine)
+
+    with Session.begin() as db_session:
+        db_session.query(Reservation) \
+            .where(Reservation.id == id) \
+            .delete()
+
     return redirect(url_for('reservation.index'))
 
 def print_reservation_result(error, start_date, end_date, number_rooms):
