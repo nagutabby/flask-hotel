@@ -98,6 +98,7 @@ def create():
         return create_ok_message()
 
 def get_reservation(id):
+    user_id = int(session['user_id'])
     engine = create_engine(current_app.config['SQLALCHEMY_DATABASE_URI'], echo=True)
     Session = sessionmaker(bind=engine)
 
@@ -114,7 +115,7 @@ def get_reservation(id):
             }
             return make_response(error_message, 404)
 
-    if reservation.user_id != g.user.id:
+    if reservation.user_id != user_id:
         error_message = {
             'error': "You don't have the permission to see the reservation."
         }
